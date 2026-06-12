@@ -78,14 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Coffee machine price checker" },
+      { name: "description", content: "Deal Detective monitors product listings for price changes, new arrivals, and removals." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Coffee machine price checker" },
+      { property: "og:description", content: "Deal Detective monitors product listings for price changes, new arrivals, and removals." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Coffee machine price checker" },
+      { name: "twitter:description", content: "Deal Detective monitors product listings for price changes, new arrivals, and removals." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0abecf02-dea8-4eaf-b86e-5457aa6914f8/id-preview-3cbb6e40--d5600236-d768-465b-a07a-18439178c2d5.lovable.app-1781265699370.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0abecf02-dea8-4eaf-b86e-5457aa6914f8/id-preview-3cbb6e40--d5600236-d768-465b-a07a-18439178c2d5.lovable.app-1781265699370.png" },
     ],
     links: [
       {
