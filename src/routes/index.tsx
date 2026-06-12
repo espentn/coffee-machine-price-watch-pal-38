@@ -25,7 +25,11 @@ type Product = {
   was_below_rrp: boolean;
   status: string;
   last_checked_at: string;
+  drink_count: number | null;
+  image_url: string | null;
+  product_url: string | null;
 };
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
