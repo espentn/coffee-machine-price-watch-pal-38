@@ -56,11 +56,14 @@ export type Database = {
       products: {
         Row: {
           code: string
+          drink_count: number | null
           first_seen_at: string
+          image_url: string | null
           in_stock: boolean
           last_checked_at: string
           name: string
           price: number | null
+          product_url: string | null
           rr_price: number | null
           status: string
           updated_at: string
@@ -68,11 +71,14 @@ export type Database = {
         }
         Insert: {
           code: string
+          drink_count?: number | null
           first_seen_at?: string
+          image_url?: string | null
           in_stock?: boolean
           last_checked_at?: string
           name: string
           price?: number | null
+          product_url?: string | null
           rr_price?: number | null
           status?: string
           updated_at?: string
@@ -80,11 +86,14 @@ export type Database = {
         }
         Update: {
           code?: string
+          drink_count?: number | null
           first_seen_at?: string
+          image_url?: string | null
           in_stock?: boolean
           last_checked_at?: string
           name?: string
           price?: number | null
+          product_url?: string | null
           rr_price?: number | null
           status?: string
           updated_at?: string

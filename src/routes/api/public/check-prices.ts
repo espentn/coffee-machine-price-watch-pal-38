@@ -113,12 +113,47 @@ async function runCheck() {
         }
       }
 
+      // Enrich with drink count + image
+      let drinkCount: number | null = null;
+      let imageUrl: string | null = null;
+      let productUrl: string | null = null;
+      try {
+        const detailRes = await fetch(
+          `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${encodeURIComponent(code)}?fields=FULL&lang=no_NO&curr=NOK`
+        );
+        if (detailRes.ok) {
+          const detail: any = await detailRes.json();
+          for (const cls of detail?.classifications ?? []) {
+            for (const f of cls?.features ?? []) {
+              if ((f?.name ?? "").toLowerCase().includes("forhåndsprogrammerte drikker")) {
+                const raw = f?.featureValues?.[0]?.value;
+                const n = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
+                if (!Number.isNaN(n)) drinkCount = n;
+              }
+            }
+          }
+          const primary = (detail?.images ?? []).find(
+            (i: any) => i?.imageType === "PRIMARY" && i?.format === "product"
+          ) ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY");
+          imageUrl = primary?.url ?? null;
+          productUrl = detail?.url
+            ? `https://www.home-appliances.philips${detail.url}`
+            : null;
+        }
+      } catch (e) {
+        console.warn("detail fetch failed for", code, e);
+      }
+
       await supabaseAdmin.from("products").upsert({
         code, name, price, rr_price: rr,
         in_stock: isPurchasable, was_below_rrp: isBelow,
         status: "active", last_checked_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        ...(drinkCount != null ? { drink_count: drinkCount } : {}),
+        ...(imageUrl ? { image_url: imageUrl } : {}),
+        ...(productUrl ? { product_url: productUrl } : {}),
       });
+
     }
 
     currentPage += 1;

@@ -25,7 +25,11 @@ type Product = {
   was_below_rrp: boolean;
   status: string;
   last_checked_at: string;
+  drink_count: number | null;
+  image_url: string | null;
+  product_url: string | null;
 };
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -127,6 +131,36 @@ function Dashboard() {
     return { active, onSale, outOfStock, alerts: alerts.length };
   }, [products, alerts]);
 
+  // Best Buy picks: active, in stock, ≥7 drinks, scored by value
+  const bestBuys = useMemo(() => {
+    const eligible = products.filter(
+      (p) =>
+        p.status === "active" &&
+        p.in_stock &&
+        p.price != null &&
+        (p.drink_count ?? 0) >= 7
+    );
+    if (eligible.length === 0) return [];
+    const prices = eligible.map((p) => p.price as number);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const drinks = eligible.map((p) => p.drink_count ?? 0);
+    const maxD = Math.max(...drinks);
+    const scored = eligible.map((p) => {
+      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP); // cheaper = higher
+      const drinkScore = maxD ? (p.drink_count ?? 0) / maxD : 0;
+      const discount = p.rr_price && p.price && p.price < p.rr_price
+        ? (p.rr_price - p.price) / p.rr_price
+        : 0;
+      // Weighted: drinks 40%, price 35%, discount 25%
+      const score = drinkScore * 0.4 + priceScore * 0.35 + discount * 0.25;
+      return { p, score, discount: Math.round(discount * 1000) / 10 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3);
+  }, [products]);
+
+
   return (
     <div className="min-h-screen px-4 py-10 md:px-8 lg:px-12">
       <div className="mx-auto max-w-7xl">
@@ -159,6 +193,84 @@ function Dashboard() {
           </div>
         </header>
 
+        {/* Best Buy */}
+        {bestBuys.length > 0 && (
+          <section className="mb-10">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                  <span style={{ color: "var(--gold)" }}>★</span> Best buy picks
+                </div>
+                <h2 className="text-xl font-semibold">
+                  Top value <span className="gold-text">right now</span>
+                </h2>
+              </div>
+              <span className="hidden text-xs text-muted-foreground md:block">
+                Scored on price, discount &amp; drink variety (≥7 drinks)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {bestBuys.map(({ p, discount }, i) => (
+                <a
+                  key={p.code}
+                  href={p.product_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="best-buy-card group relative flex flex-col overflow-hidden rounded-2xl p-5 transition"
+                >
+                  {i === 0 && (
+                    <span
+                      className="absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ background: "var(--gold)", color: "#1a1108" }}
+                    >
+                      #1 Pick
+                    </span>
+                  )}
+                  <div className="mb-4 flex h-32 items-center justify-center rounded-xl bg-secondary/30">
+                    {p.image_url ? (
+                      <img
+                        src={p.image_url}
+                        alt={p.name}
+                        loading="lazy"
+                        className="h-full w-auto object-contain p-2"
+                      />
+                    ) : (
+                      <span className="text-3xl">☕</span>
+                    )}
+                  </div>
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{p.name}</h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-full bg-secondary/60 px-2.5 py-1 font-semibold">
+                      {fmtPrice(p.price)}
+                    </span>
+                    {p.rr_price != null && p.price != null && p.price < p.rr_price && (
+                      <span className="rounded-full bg-secondary/40 px-2.5 py-1 text-muted-foreground line-through">
+                        {fmtPrice(p.rr_price)}
+                      </span>
+                    )}
+                    {discount > 0 && (
+                      <span
+                        className="rounded-full px-2.5 py-1 font-semibold"
+                        style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}
+                      >
+                        −{discount}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span style={{ color: "var(--gold)" }}>☕</span>
+                      {p.drink_count} drinks
+                    </span>
+                    <span className="opacity-50">•</span>
+                    <span>{p.code}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Stats */}
         <div className="mb-10 grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Active products" value={stats.active} />
@@ -166,6 +278,7 @@ function Dashboard() {
           <StatCard label="Out of stock" value={stats.outOfStock} />
           <StatCard label="Recent alerts" value={stats.alerts} />
         </div>
+
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr]">
           {/* Alerts feed */}
