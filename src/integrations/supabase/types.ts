@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          discount_pct: number | null
+          id: string
+          message: string
+          old_price: number | null
+          price: number | null
+          product_code: string | null
+          product_name: string
+          rr_price: number | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          discount_pct?: number | null
+          id?: string
+          message: string
+          old_price?: number | null
+          price?: number | null
+          product_code?: string | null
+          product_name: string
+          rr_price?: number | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          discount_pct?: number | null
+          id?: string
+          message?: string
+          old_price?: number | null
+          price?: number | null
+          product_code?: string | null
+          product_name?: string
+          rr_price?: number | null
+          type?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          code: string
+          first_seen_at: string
+          in_stock: boolean
+          last_checked_at: string
+          name: string
+          price: number | null
+          rr_price: number | null
+          status: string
+          updated_at: string
+          was_below_rrp: boolean
+        }
+        Insert: {
+          code: string
+          first_seen_at?: string
+          in_stock?: boolean
+          last_checked_at?: string
+          name: string
+          price?: number | null
+          rr_price?: number | null
+          status?: string
+          updated_at?: string
+          was_below_rrp?: boolean
+        }
+        Update: {
+          code?: string
+          first_seen_at?: string
+          in_stock?: boolean
+          last_checked_at?: string
+          name?: string
+          price?: number | null
+          rr_price?: number | null
+          status?: string
+          updated_at?: string
+          was_below_rrp?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
