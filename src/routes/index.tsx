@@ -131,6 +131,36 @@ function Dashboard() {
     return { active, onSale, outOfStock, alerts: alerts.length };
   }, [products, alerts]);
 
+  // Best Buy picks: active, in stock, ≥7 drinks, scored by value
+  const bestBuys = useMemo(() => {
+    const eligible = products.filter(
+      (p) =>
+        p.status === "active" &&
+        p.in_stock &&
+        p.price != null &&
+        (p.drink_count ?? 0) >= 7
+    );
+    if (eligible.length === 0) return [];
+    const prices = eligible.map((p) => p.price as number);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const drinks = eligible.map((p) => p.drink_count ?? 0);
+    const maxD = Math.max(...drinks);
+    const scored = eligible.map((p) => {
+      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP); // cheaper = higher
+      const drinkScore = maxD ? (p.drink_count ?? 0) / maxD : 0;
+      const discount = p.rr_price && p.price && p.price < p.rr_price
+        ? (p.rr_price - p.price) / p.rr_price
+        : 0;
+      // Weighted: drinks 40%, price 35%, discount 25%
+      const score = drinkScore * 0.4 + priceScore * 0.35 + discount * 0.25;
+      return { p, score, discount: Math.round(discount * 1000) / 10 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3);
+  }, [products]);
+
+
   return (
     <div className="min-h-screen px-4 py-10 md:px-8 lg:px-12">
       <div className="mx-auto max-w-7xl">
