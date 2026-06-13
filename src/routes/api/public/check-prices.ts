@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const BASE_URL = "https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/search";
-const TARGET_KEYWORD = "helautomatisk espressomaskin";
+const TARGET_KEYWORDS = ["helautomatisk espressomaskin", "kaffemaskin", "espressomaskin"];
 
 type AlertRow = {
   type: string;
