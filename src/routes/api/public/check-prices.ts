@@ -68,7 +68,8 @@ async function runCheck() {
       const name: string = p.name ?? "";
       const code: string | undefined = p.originalCode;
       if (!code) continue;
-      if (!name.toLowerCase().includes(TARGET_KEYWORD)) continue;
+      const lname = name.toLowerCase();
+      if (!TARGET_KEYWORDS.some((k) => lname.includes(k))) continue;
       foundCodes.add(code);
 
       const price = p?.price?.value;
