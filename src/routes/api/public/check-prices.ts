@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const BASE_URL = "https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/search";
-const TARGET_KEYWORD = "helautomatisk espressomaskin";
+const TARGET_KEYWORDS = ["helautomatisk espressomaskin", "kaffemaskin", "espressomaskin"];
 
 type AlertRow = {
   type: string;
@@ -68,7 +68,8 @@ async function runCheck() {
       const name: string = p.name ?? "";
       const code: string | undefined = p.originalCode;
       if (!code) continue;
-      if (!name.toLowerCase().includes(TARGET_KEYWORD)) continue;
+      const lname = name.toLowerCase();
+      if (!TARGET_KEYWORDS.some((k) => lname.includes(k))) continue;
       foundCodes.add(code);
 
       const price = p?.price?.value;
@@ -118,24 +119,26 @@ async function runCheck() {
       let imageUrl: string | null = null;
       let productUrl: string | null = null;
       try {
+        const detailCode = code.replace(/\//g, "_");
         const detailRes = await fetch(
-          `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${encodeURIComponent(code)}?fields=FULL&lang=no_NO&curr=NOK`
+          `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${detailCode}?fields=FULL&lang=no_NO&curr=NOK`
         );
         if (detailRes.ok) {
           const detail: any = await detailRes.json();
-          for (const cls of detail?.classifications ?? []) {
-            for (const f of cls?.features ?? []) {
-              if ((f?.name ?? "").toLowerCase().includes("forhåndsprogrammerte drikker")) {
-                const raw = f?.featureValues?.[0]?.value;
-                const n = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
-                if (!Number.isNaN(n)) drinkCount = n;
-              }
-            }
+          const feats: any[] = detail?.productFeatures?.features ?? [];
+          const drinkRegex = /(\d{1,2})[^\d]{0,60}?\b(drikker|drinks)\b/i;
+          const nums: number[] = [];
+          for (const f of feats) {
+            const blob = [f?.name, f?.featureReferenceName, f?.featureShortDescription]
+              .filter(Boolean).join(" | ");
+            const m = blob.match(drinkRegex);
+            if (m) nums.push(parseInt(m[1], 10));
           }
-          const primary = (detail?.images ?? []).find(
-            (i: any) => i?.imageType === "PRIMARY" && i?.format === "product"
-          ) ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY");
-          imageUrl = primary?.url ?? null;
+          if (nums.length) drinkCount = Math.max(...nums);
+
+          imageUrl = detail?.primaryImage?.url
+            ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY")?.url
+            ?? null;
           productUrl = detail?.url
             ? `https://www.home-appliances.philips${detail.url}`
             : null;
