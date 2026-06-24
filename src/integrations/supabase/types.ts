@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       alerts: {
         Row: {
+          category: string | null
           created_at: string
           discount_pct: number | null
           id: string
@@ -28,6 +29,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           discount_pct?: number | null
           id?: string
@@ -40,6 +42,7 @@ export type Database = {
           type: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           discount_pct?: number | null
           id?: string
@@ -55,11 +58,13 @@ export type Database = {
       }
       products: {
         Row: {
+          category: string
           code: string
           drink_count: number | null
           first_seen_at: string
           image_url: string | null
           in_stock: boolean
+          is_refurbished: boolean
           last_checked_at: string
           name: string
           price: number | null
@@ -70,11 +75,13 @@ export type Database = {
           was_below_rrp: boolean
         }
         Insert: {
+          category?: string
           code: string
           drink_count?: number | null
           first_seen_at?: string
           image_url?: string | null
           in_stock?: boolean
+          is_refurbished?: boolean
           last_checked_at?: string
           name: string
           price?: number | null
@@ -85,11 +92,13 @@ export type Database = {
           was_below_rrp?: boolean
         }
         Update: {
+          category?: string
           code?: string
           drink_count?: number | null
           first_seen_at?: string
           image_url?: string | null
           in_stock?: boolean
+          is_refurbished?: boolean
           last_checked_at?: string
           name?: string
           price?: number | null
