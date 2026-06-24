@@ -135,35 +135,48 @@ function Dashboard() {
     return { active, onSale, outOfStock, alerts: alerts.length };
   }, [products, alerts]);
 
-  // Best Buy picks: active, in stock, ≥7 drinks, scored by value
-  const bestBuys = useMemo(() => {
+  // Best Buy picks per category
+  function pickBest(cat: Category, opts?: { minDrinks?: number }): { p: Product; discount: number } | null {
     const eligible = products.filter(
       (p) =>
+        p.category === cat &&
         p.status === "active" &&
         p.in_stock &&
         p.price != null &&
-        (p.drink_count ?? 0) >= 7
+        (opts?.minDrinks ? (p.drink_count ?? 0) >= opts.minDrinks : true)
     );
-    if (eligible.length === 0) return [];
+    if (eligible.length === 0) return null;
     const prices = eligible.map((p) => p.price as number);
     const minP = Math.min(...prices);
     const maxP = Math.max(...prices);
-    const drinks = eligible.map((p) => p.drink_count ?? 0);
-    const maxD = Math.max(...drinks);
     const scored = eligible.map((p) => {
-      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP); // cheaper = higher
-      const drinkScore = maxD ? (p.drink_count ?? 0) / maxD : 0;
+      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP);
       const discount = p.rr_price && p.price && p.price < p.rr_price
         ? (p.rr_price - p.price) / p.rr_price
         : 0;
-      // Weighted: drinks 40%, price 35%, discount 25%
-      const score = drinkScore * 0.4 + priceScore * 0.35 + discount * 0.25;
+      let extra = 0;
+      if (cat === "coffee" && p.drink_count) {
+        extra = Math.min(p.drink_count / 12, 1) * 0.35;
+      }
+      const score = priceScore * 0.45 + discount * 0.25 + extra;
       return { p, score, discount: Math.round(discount * 1000) / 10 };
     });
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 3);
-  }, [products]);
+    return { p: scored[0].p, discount: scored[0].discount };
+  }
 
+  const coffeePick = useMemo(() => pickBest("coffee", { minDrinks: 7 }), [products]);
+  const airPick = useMemo(() => pickBest("air"), [products]);
+
+  // Watchlist: Air Performer (any) + refurbished vacuums
+  const watchlist = useMemo(() => {
+    return products.filter((p) => {
+      if (p.status !== "active") return false;
+      const isAirPerformer = p.name.toLowerCase().includes("air performer");
+      const isRefurbVacuum = p.category === "vacuum" && p.is_refurbished;
+      return isAirPerformer || isRefurbVacuum;
+    });
+  }, [products]);
 
   return (
     <div className="min-h-screen px-4 py-10 md:px-8 lg:px-12">
@@ -176,11 +189,11 @@ function Dashboard() {
               Live monitor
             </div>
             <h1 className="text-4xl md:text-5xl font-semibold leading-tight">
-              <span className="gold-text">Espresso</span> Watch
+              <span className="gold-text">Home</span> Watch
             </h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Tracking <em>helautomatisk espressomaskin</em> on Philips Norway. Alerts fire on every price drop, new
-              arrival, removal, and stock change — here and on Telegram.
+              Tracking Philips Norway across espresso, air &amp; vacuums. Alerts fire on every price drop, new arrival,
+              removal and stock change — here and on Telegram.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -197,125 +210,91 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Best Buy */}
-        {bestBuys.length > 0 && (
-          <section className="mb-12">
-            <div className="mb-5 flex items-end justify-between">
-              <div>
-                <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                  <span style={{ color: "var(--gold)" }}>★</span> Best buy picks
-                </div>
-                <h2 className="text-2xl md:text-3xl font-semibold">
-                  Top value <span className="gold-text">right now</span>
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Scored on price, discount &amp; drink variety (≥7 drinks)
-                </p>
+        {/* Top picks: two columns */}
+        {(coffeePick || airPick) && (
+          <section className="mb-10">
+            <div className="mb-5">
+              <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <span style={{ color: "var(--gold)" }}>★</span> Top picks right now
               </div>
+              <h2 className="text-2xl md:text-3xl font-semibold">
+                <span className="gold-text">Coffee</span> &amp; <span className="gold-text">Air</span> · side by side
+              </h2>
             </div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <TopPickCard pick={coffeePick} category="coffee" />
+              <TopPickCard pick={airPick} category="air" />
+            </div>
+          </section>
+        )}
 
-            {/* Hero pick */}
-            {bestBuys[0] && (() => {
-              const { p, discount } = bestBuys[0];
-              return (
-                <a
-                  href={p.product_url ?? "#"}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="best-buy-card group relative mb-4 flex flex-col gap-6 overflow-hidden rounded-3xl p-6 md:flex-row md:p-8"
-                >
-                  <span
-                    className="absolute right-5 top-5 z-10 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider"
-                    style={{ background: "var(--gold)", color: "#1a1108" }}
-                  >
-                    ★ #1 Pick
-                  </span>
-                  <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-secondary/40 md:h-72 md:w-1/2">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-4" />
-                    ) : (
-                      <span className="text-6xl">☕</span>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col justify-center">
-                    <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                      Editor's choice · {p.code}
-                    </div>
-                    <h3 className="text-2xl md:text-3xl font-semibold leading-tight">{p.name}</h3>
-                    <div className="mt-5 flex flex-wrap items-center gap-3">
-                      <span className="rounded-full bg-secondary/70 px-4 py-2 text-lg font-bold">
-                        {fmtPrice(p.price)}
-                      </span>
-                      {p.rr_price != null && p.price != null && p.price < p.rr_price && (
-                        <span className="rounded-full bg-secondary/40 px-3 py-2 text-sm text-muted-foreground line-through">
-                          {fmtPrice(p.rr_price)}
-                        </span>
-                      )}
-                      {discount > 0 && (
-                        <span
-                          className="rounded-full px-3 py-2 text-sm font-bold"
-                          style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 18%, transparent)" }}
-                        >
-                          −{discount}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span style={{ color: "var(--gold)" }}>☕</span>
-                        <strong className="text-foreground">{p.drink_count}</strong> drinks
-                      </span>
-                      {p.in_stock && <span className="inline-flex items-center gap-1.5">✓ In stock</span>}
-                    </div>
-                  </div>
-                </a>
-              );
-            })()}
-
-            {/* Runner-ups */}
-            {bestBuys.length > 1 && (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {bestBuys.slice(1).map(({ p, discount }, i) => (
+        {/* Watchlist */}
+        {watchlist.length > 0 && (
+          <section className="mb-12">
+            <div className="mb-4">
+              <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <span>👀</span> Watchlist
+              </div>
+              <h2 className="text-xl md:text-2xl font-semibold">
+                Air Performer &amp; refurbished vacuums
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Calling these out the moment they drop in price — especially renovated stock.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {watchlist.map((p) => {
+                const discount = p.rr_price && p.price && p.price < p.rr_price
+                  ? Math.round(((p.rr_price - p.price) / p.rr_price) * 1000) / 10
+                  : 0;
+                return (
                   <a
                     key={p.code}
                     href={p.product_url ?? "#"}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="best-buy-card group relative flex gap-4 overflow-hidden rounded-2xl p-5 transition"
+                    className="glass-card flex gap-3 rounded-2xl p-4"
                   >
-                    <span className="absolute right-4 top-4 rounded-full bg-secondary/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      #{i + 2}
-                    </span>
-                    <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-xl bg-secondary/30">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-secondary/40">
                       {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-1.5" />
+                        <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-1" />
                       ) : (
-                        <span className="text-3xl">☕</span>
+                        <span className="text-2xl">{p.category === "vacuum" ? "🧹" : "🌬️"}</span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-2 pr-8 text-sm font-semibold leading-snug">{p.name}</h3>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="rounded-full bg-secondary/60 px-2 py-1 font-semibold">
-                          {fmtPrice(p.price)}
-                        </span>
-                        {discount > 0 && (
-                          <span
-                            className="rounded-full px-2 py-1 font-semibold"
-                            style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}
-                          >
-                            −{discount}%
+                      <div className="flex flex-wrap items-center gap-1">
+                        {p.is_refurbished && (
+                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                            style={{ color: "oklch(0.85 0.12 150)", background: "color-mix(in oklch, oklch(0.78 0.12 150) 18%, transparent)" }}>
+                            ♻ Refurb
+                          </span>
+                        )}
+                        {p.name.toLowerCase().includes("air performer") && (
+                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                            style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 18%, transparent)" }}>
+                            ★ Air Performer
                           </span>
                         )}
                       </div>
-                      <div className="mt-2 text-[11px] text-muted-foreground">
-                        <span style={{ color: "var(--gold)" }}>☕</span> {p.drink_count} drinks · {p.code}
+                      <h3 className="mt-1 line-clamp-2 text-xs font-semibold leading-snug">{p.name}</h3>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-full bg-secondary/60 px-2 py-0.5 font-semibold">{fmtPrice(p.price)}</span>
+                        {discount > 0 && (
+                          <span className="rounded-full px-2 py-0.5 font-semibold"
+                            style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}>
+                            −{discount}%
+                          </span>
+                        )}
+                        {!p.in_stock && <span className="text-muted-foreground">· sold out</span>}
                       </div>
                     </div>
                   </a>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
+          </section>
+        )}
           </section>
         )}
 
