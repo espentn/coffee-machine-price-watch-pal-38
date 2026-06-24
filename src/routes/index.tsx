@@ -39,7 +39,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Home Watch — Philips Price Tracker" },
-      { name: "description", content: "Live price-drop and stock alerts for Philips espresso machines, air purifiers and vacuums." },
+      { name: "description", content: "Live price-drop and stock alerts for Philips espresso machines, air purifiers, vacuums and robot vacuums." },
       { property: "og:title", content: "Home Watch" },
       { property: "og:description", content: "Live price-drop and stock alerts across Philips Norway." },
     ],
@@ -218,7 +218,7 @@ function Dashboard() {
               <span className="gold-text">Home</span> Watch
             </h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Tracking Philips Norway across espresso, air &amp; vacuums. Alerts fire on every price drop, new arrival,
+              Tracking Philips Norway across espresso, air, vacuums and robot vacuums. Alerts fire on every price drop, new arrival,
               removal and stock change — here and on Telegram.
             </p>
           </div>

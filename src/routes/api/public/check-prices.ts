@@ -5,9 +5,10 @@ const BASE_URL = "https://www.home-appliances.philips/occ/v2/versuni-b2c-no/prod
 type Category = "coffee" | "air" | "vacuum";
 
 type CategoryConfig = {
-  id: Category;
+  id: string;
   apiCategory: string;
   keywords: string[]; // lowercase substrings; product name must include at least one
+  category: Category;
 };
 
 const CATEGORIES: CategoryConfig[] = [
@@ -15,16 +16,25 @@ const CATEGORIES: CategoryConfig[] = [
     id: "coffee",
     apiCategory: "COFFEEMAKERS_AND_KETTLES_CA",
     keywords: ["helautomatisk espressomaskin", "kaffemaskin", "espressomaskin"],
+    category: "coffee",
   },
   {
     id: "air",
     apiCategory: "AIR_PURIFIER_CA",
     keywords: ["luftrenser", "air purifier", "air performer", "luftfukter", "humidifier"],
+    category: "air",
   },
   {
-    id: "vacuum",
+    id: "vacuum-canister",
     apiCategory: "CANISTER_VACUUMS_SU",
     keywords: ["støvsuger", "vacuum"],
+    category: "vacuum",
+  },
+  {
+    id: "vacuum-robot",
+    apiCategory: "ROBOT_VACUUMS_SU",
+    keywords: ["robotstøvsuger", "robot vacuum", "robot vacuum cleaner", "robot støvsuger"],
+    category: "vacuum",
   },
 ];
 
@@ -131,16 +141,16 @@ async function runCheck() {
             product_name: name,
             message: `🆕 NEW ARRIVAL — ${price} kr ${status}${stockMsg}${refurbTag}`,
             price, old_price: null, rr_price: rr, discount_pct: isBelow ? discount : null,
-            category: cat.id,
+            category: cat.category,
           });
         } else {
           const prevStock = prev.in_stock;
           if (isPurchasable && !prevStock) {
             alerts.push({ type: "back_in_stock", product_code: code, product_name: name,
-              message: `✅ BACK IN STOCK — available again`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.id });
+              message: `✅ BACK IN STOCK — available again`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.category });
           } else if (!isPurchasable && prevStock) {
             alerts.push({ type: "sold_out", product_code: code, product_name: name,
-              message: `❌ SOLD OUT — no longer available`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.id });
+              message: `❌ SOLD OUT — no longer available`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.category });
           }
 
           const oldPrice = Number(prev.price);
@@ -149,12 +159,12 @@ async function runCheck() {
             const prefix = isAirPerformer && isRefurb ? "🌬️🔥 AIR PERFORMER REFURB DEAL" : "🔥 SALE STARTED";
             alerts.push({ type: "sale_started", product_code: code, product_name: name,
               message: `${prefix} — ${price} kr (${discount}% off RRP ${rr} kr)`,
-              price, old_price: oldPrice, rr_price: rr, discount_pct: discount, category: cat.id });
+              price, old_price: oldPrice, rr_price: rr, discount_pct: discount, category: cat.category });
           } else if (price < oldPrice) {
             const prefix = isAirPerformer && isRefurb ? "🌬️📉 AIR PERFORMER REFURB DROP" : "📉 PRICE DROP";
             alerts.push({ type: "price_drop", product_code: code, product_name: name,
               message: `${prefix} — Now ${price} kr (was ${oldPrice} kr)`,
-              price, old_price: oldPrice, rr_price: rr, discount_pct: isBelow ? discount : null, category: cat.id });
+              price, old_price: oldPrice, rr_price: rr, discount_pct: isBelow ? discount : null, category: cat.category });
           }
         }
 
@@ -198,7 +208,7 @@ async function runCheck() {
           in_stock: isPurchasable, was_below_rrp: isBelow,
           status: "active", last_checked_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          category: cat.id,
+          category: cat.category,
           is_refurbished: isRefurb,
           ...(drinkCount != null ? { drink_count: drinkCount } : {}),
           ...(imageUrl ? { image_url: imageUrl } : {}),
