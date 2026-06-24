@@ -445,3 +445,86 @@ function Pill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabe
     </span>
   );
 }
+
+function TopPickCard({
+  pick,
+  category,
+}: {
+  pick: { p: Product; discount: number } | null;
+  category: Category;
+}) {
+  const meta = {
+    coffee: { label: "Coffee", emoji: "☕", tagline: "Best espresso value" },
+    air: { label: "Air", emoji: "🌬️", tagline: "Best air purifier value" },
+    vacuum: { label: "Vacuum", emoji: "🧹", tagline: "Best vacuum value" },
+  }[category];
+
+  if (!pick) {
+    return (
+      <div className="best-buy-card flex h-full flex-col items-center justify-center rounded-3xl p-8 text-center">
+        <span className="text-5xl">{meta.emoji}</span>
+        <div className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{meta.label}</div>
+        <p className="mt-2 text-sm text-muted-foreground">No in-stock picks yet — run a check.</p>
+      </div>
+    );
+  }
+  const { p, discount } = pick;
+  return (
+    <a
+      href={p.product_url ?? "#"}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="best-buy-card relative flex h-full flex-col gap-4 overflow-hidden rounded-3xl p-6"
+    >
+      <span
+        className="absolute right-4 top-4 z-10 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider"
+        style={{ background: "var(--gold)", color: "#1a1108" }}
+      >
+        ★ {meta.label} Pick
+      </span>
+      <div className="flex h-44 w-full items-center justify-center rounded-2xl bg-secondary/40">
+        {p.image_url ? (
+          <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-3" />
+        ) : (
+          <span className="text-6xl">{meta.emoji}</span>
+        )}
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          {meta.tagline} · {p.code}
+        </div>
+        <h3 className="mt-1 text-lg md:text-xl font-semibold leading-tight">{p.name}</h3>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-secondary/70 px-3 py-1.5 text-base font-bold">
+            {fmtPrice(p.price)}
+          </span>
+          {p.rr_price != null && p.price != null && p.price < p.rr_price && (
+            <span className="rounded-full bg-secondary/40 px-2.5 py-1.5 text-xs text-muted-foreground line-through">
+              {fmtPrice(p.rr_price)}
+            </span>
+          )}
+          {discount > 0 && (
+            <span
+              className="rounded-full px-2.5 py-1.5 text-xs font-bold"
+              style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 18%, transparent)" }}
+            >
+              −{discount}%
+            </span>
+          )}
+        </div>
+        {category === "coffee" && p.drink_count != null && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            <span style={{ color: "var(--gold)" }}>☕</span> <strong className="text-foreground">{p.drink_count}</strong> drinks
+          </div>
+        )}
+        {p.is_refurbished && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: "oklch(0.85 0.12 150)", background: "color-mix(in oklch, oklch(0.78 0.12 150) 16%, transparent)" }}>
+            ♻ Refurbished
+          </div>
+        )}
+      </div>
+    </a>
+  );
+}
+
