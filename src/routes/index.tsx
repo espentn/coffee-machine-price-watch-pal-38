@@ -167,6 +167,32 @@ function Dashboard() {
 
   const coffeePick = useMemo(() => pickBest("coffee", { minDrinks: 7 }), [products]);
   const airPick = useMemo(() => pickBest("air"), [products]);
+  const vacuumPick = useMemo(() => pickBest("vacuum"), [products]);
+
+  // Top lists per category — scored same way, top 6
+  function topList(cat: Category, limit = 6): { p: Product; discount: number }[] {
+    const eligible = products.filter((p) => p.category === cat && p.status === "active" && p.price != null);
+    if (eligible.length === 0) return [];
+    const prices = eligible.map((p) => p.price as number);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const scored = eligible.map((p) => {
+      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP);
+      const discount = p.rr_price && p.price && p.price < p.rr_price
+        ? (p.rr_price - p.price) / p.rr_price
+        : 0;
+      let extra = 0;
+      if (cat === "coffee" && p.drink_count) extra = Math.min(p.drink_count / 12, 1) * 0.3;
+      const stockPenalty = p.in_stock ? 0 : -0.5;
+      const score = priceScore * 0.45 + discount * 0.25 + extra + stockPenalty;
+      return { p, score, discount: Math.round(discount * 1000) / 10 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit);
+  }
+  const coffeeTop = useMemo(() => topList("coffee"), [products]);
+  const airTop = useMemo(() => topList("air"), [products]);
+  const vacuumTop = useMemo(() => topList("vacuum"), [products]);
 
   // Watchlist: Air Performer (any) + refurbished vacuums
   const watchlist = useMemo(() => {
