@@ -1,7 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const BASE_URL = "https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/search";
-const TARGET_KEYWORDS = ["helautomatisk espressomaskin", "kaffemaskin", "espressomaskin"];
+
+type Category = "coffee" | "air" | "vacuum";
+
+type CategoryConfig = {
+  id: Category;
+  apiCategory: string;
+  keywords: string[]; // lowercase substrings; product name must include at least one
+};
+
+const CATEGORIES: CategoryConfig[] = [
+  {
+    id: "coffee",
+    apiCategory: "COFFEEMAKERS_AND_KETTLES_CA",
+    keywords: ["helautomatisk espressomaskin", "kaffemaskin", "espressomaskin"],
+  },
+  {
+    id: "air",
+    apiCategory: "AIR_PURIFIER_CA",
+    keywords: ["luftrenser", "air purifier", "air performer", "luftfukter", "humidifier"],
+  },
+  {
+    id: "vacuum",
+    apiCategory: "CANISTER_VACUUMS_SU",
+    keywords: ["støvsuger", "vacuum"],
+  },
+];
 
 type AlertRow = {
   type: string;
@@ -12,11 +37,17 @@ type AlertRow = {
   old_price: number | null;
   rr_price: number | null;
   discount_pct: number | null;
+  category: Category;
 };
 
 function calculateDiscount(current: number, rrp: number | null | undefined) {
   if (!rrp || rrp <= 0 || current >= rrp) return 0;
   return Math.round(((rrp - current) / rrp) * 1000) / 10;
+}
+
+function detectRefurbished(name: string) {
+  const n = name.toLowerCase();
+  return /\b(renover|refurb|outlet|brukt)/i.test(n);
 }
 
 async function sendTelegram(text: string) {
@@ -44,122 +75,139 @@ async function runCheck() {
   const foundCodes = new Set<string>();
   const alerts: AlertRow[] = [];
 
-  let currentPage = 0;
-  let totalPages = 1;
+  for (const cat of CATEGORIES) {
+    let currentPage = 0;
+    let totalPages = 1;
 
-  while (currentPage < totalPages) {
-    const params = new URLSearchParams({
-      fields: "products(code,originalCode,name,purchasable,price(FULL),rrPrice(FULL),stock(FULL)),pagination(DEFAULT)",
-      query: ":relevance:allCategories:COFFEEMAKERS_AND_KETTLES_CA",
-      pageSize: "24",
-      country: "no",
-      lang: "no_NO",
-      curr: "NOK",
-      currentPage: String(currentPage),
-    });
-
-    const res = await fetch(`${BASE_URL}?${params.toString()}`);
-    if (!res.ok) throw new Error(`Philips API ${res.status}`);
-    const data: any = await res.json();
-    totalPages = data?.pagination?.totalPages ?? 1;
-    const products: any[] = data?.products ?? [];
-
-    for (const p of products) {
-      const name: string = p.name ?? "";
-      const code: string | undefined = p.originalCode;
-      if (!code) continue;
-      const lname = name.toLowerCase();
-      if (!TARGET_KEYWORDS.some((k) => lname.includes(k))) continue;
-      foundCodes.add(code);
-
-      const price = p?.price?.value;
-      const rr = p?.rrPrice?.value ?? null;
-      const isPurchasable = p?.purchasable ?? true;
-      if (price == null) continue;
-
-      const discount = calculateDiscount(price, rr);
-      const isBelow = rr != null && price < rr;
-      const prev = db.get(code);
-
-      if (!prev) {
-        const status = isBelow ? `🔥 ON SALE (${discount}% off)` : "at RRP";
-        const stockMsg = isPurchasable ? "" : " (SOLD OUT)";
-        alerts.push({
-          type: "new",
-          product_code: code,
-          product_name: name,
-          message: `🆕 NEW ARRIVAL — ${price} kr ${status}${stockMsg}`,
-          price, old_price: null, rr_price: rr, discount_pct: isBelow ? discount : null,
-        });
-      } else {
-        const prevStock = prev.in_stock;
-        if (isPurchasable && !prevStock) {
-          alerts.push({ type: "back_in_stock", product_code: code, product_name: name,
-            message: `✅ BACK IN STOCK — available again`, price, old_price: null, rr_price: rr, discount_pct: null });
-        } else if (!isPurchasable && prevStock) {
-          alerts.push({ type: "sold_out", product_code: code, product_name: name,
-            message: `❌ SOLD OUT — no longer available`, price, old_price: null, rr_price: rr, discount_pct: null });
-        }
-
-        const oldPrice = Number(prev.price);
-        const previouslyBelow = prev.was_below_rrp;
-        if (isBelow && !previouslyBelow) {
-          alerts.push({ type: "sale_started", product_code: code, product_name: name,
-            message: `🔥 SALE STARTED — ${price} kr (${discount}% off RRP ${rr} kr)`,
-            price, old_price: oldPrice, rr_price: rr, discount_pct: discount });
-        } else if (price < oldPrice) {
-          alerts.push({ type: "price_drop", product_code: code, product_name: name,
-            message: `📉 PRICE DROP — Now ${price} kr (was ${oldPrice} kr)`,
-            price, old_price: oldPrice, rr_price: rr, discount_pct: isBelow ? discount : null });
-        }
-      }
-
-      // Enrich with drink count + image
-      let drinkCount: number | null = null;
-      let imageUrl: string | null = null;
-      let productUrl: string | null = null;
-      try {
-        const detailCode = code.replace(/\//g, "_");
-        const detailRes = await fetch(
-          `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${detailCode}?fields=FULL&lang=no_NO&curr=NOK`
-        );
-        if (detailRes.ok) {
-          const detail: any = await detailRes.json();
-          const feats: any[] = detail?.productFeatures?.features ?? [];
-          const drinkRegex = /(\d{1,2})[^\d]{0,60}?\b(drikker|drinks)\b/i;
-          const nums: number[] = [];
-          for (const f of feats) {
-            const blob = [f?.name, f?.featureReferenceName, f?.featureShortDescription]
-              .filter(Boolean).join(" | ");
-            const m = blob.match(drinkRegex);
-            if (m) nums.push(parseInt(m[1], 10));
-          }
-          if (nums.length) drinkCount = Math.max(...nums);
-
-          imageUrl = detail?.primaryImage?.url
-            ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY")?.url
-            ?? null;
-          productUrl = detail?.url
-            ? `https://www.home-appliances.philips${detail.url}`
-            : null;
-        }
-      } catch (e) {
-        console.warn("detail fetch failed for", code, e);
-      }
-
-      await supabaseAdmin.from("products").upsert({
-        code, name, price, rr_price: rr,
-        in_stock: isPurchasable, was_below_rrp: isBelow,
-        status: "active", last_checked_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        ...(drinkCount != null ? { drink_count: drinkCount } : {}),
-        ...(imageUrl ? { image_url: imageUrl } : {}),
-        ...(productUrl ? { product_url: productUrl } : {}),
+    while (currentPage < totalPages) {
+      const params = new URLSearchParams({
+        fields:
+          "products(code,originalCode,name,purchasable,price(FULL),rrPrice(FULL),stock(FULL)),pagination(DEFAULT)",
+        query: `:relevance:allCategories:${cat.apiCategory}`,
+        pageSize: "24",
+        country: "no",
+        lang: "no_NO",
+        curr: "NOK",
+        currentPage: String(currentPage),
       });
 
-    }
+      const res = await fetch(`${BASE_URL}?${params.toString()}`);
+      if (!res.ok) {
+        console.warn(`Philips API ${res.status} for category ${cat.id}`);
+        break;
+      }
+      const data: any = await res.json();
+      totalPages = data?.pagination?.totalPages ?? 1;
+      const products: any[] = data?.products ?? [];
 
-    currentPage += 1;
+      for (const p of products) {
+        const name: string = p.name ?? "";
+        const code: string | undefined = p.originalCode;
+        if (!code) continue;
+        const lname = name.toLowerCase();
+        if (!cat.keywords.some((k) => lname.includes(k))) continue;
+        foundCodes.add(code);
+
+        const price = p?.price?.value;
+        const rr = p?.rrPrice?.value ?? null;
+        const isPurchasable = p?.purchasable ?? true;
+        const isRefurb = detectRefurbished(name);
+        if (price == null) continue;
+
+        const discount = calculateDiscount(price, rr);
+        const isBelow = rr != null && price < rr;
+        const prev = db.get(code);
+
+        // Special hot-watch: Air Performer refurbished going on sale
+        const isAirPerformer = lname.includes("air performer");
+
+        if (!prev) {
+          const status = isBelow ? `🔥 ON SALE (${discount}% off)` : "at RRP";
+          const stockMsg = isPurchasable ? "" : " (SOLD OUT)";
+          const refurbTag = isRefurb ? " ♻️ Refurbished" : "";
+          alerts.push({
+            type: "new",
+            product_code: code,
+            product_name: name,
+            message: `🆕 NEW ARRIVAL — ${price} kr ${status}${stockMsg}${refurbTag}`,
+            price, old_price: null, rr_price: rr, discount_pct: isBelow ? discount : null,
+            category: cat.id,
+          });
+        } else {
+          const prevStock = prev.in_stock;
+          if (isPurchasable && !prevStock) {
+            alerts.push({ type: "back_in_stock", product_code: code, product_name: name,
+              message: `✅ BACK IN STOCK — available again`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.id });
+          } else if (!isPurchasable && prevStock) {
+            alerts.push({ type: "sold_out", product_code: code, product_name: name,
+              message: `❌ SOLD OUT — no longer available`, price, old_price: null, rr_price: rr, discount_pct: null, category: cat.id });
+          }
+
+          const oldPrice = Number(prev.price);
+          const previouslyBelow = prev.was_below_rrp;
+          if (isBelow && !previouslyBelow) {
+            const prefix = isAirPerformer && isRefurb ? "🌬️🔥 AIR PERFORMER REFURB DEAL" : "🔥 SALE STARTED";
+            alerts.push({ type: "sale_started", product_code: code, product_name: name,
+              message: `${prefix} — ${price} kr (${discount}% off RRP ${rr} kr)`,
+              price, old_price: oldPrice, rr_price: rr, discount_pct: discount, category: cat.id });
+          } else if (price < oldPrice) {
+            const prefix = isAirPerformer && isRefurb ? "🌬️📉 AIR PERFORMER REFURB DROP" : "📉 PRICE DROP";
+            alerts.push({ type: "price_drop", product_code: code, product_name: name,
+              message: `${prefix} — Now ${price} kr (was ${oldPrice} kr)`,
+              price, old_price: oldPrice, rr_price: rr, discount_pct: isBelow ? discount : null, category: cat.id });
+          }
+        }
+
+        // Enrich with drink count + image (drink count only meaningful for coffee)
+        let drinkCount: number | null = null;
+        let imageUrl: string | null = null;
+        let productUrl: string | null = null;
+        try {
+          const detailCode = code.replace(/\//g, "_");
+          const detailRes = await fetch(
+            `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${detailCode}?fields=FULL&lang=no_NO&curr=NOK`
+          );
+          if (detailRes.ok) {
+            const detail: any = await detailRes.json();
+            if (cat.id === "coffee") {
+              const feats: any[] = detail?.productFeatures?.features ?? [];
+              const drinkRegex = /(\d{1,2})[^\d]{0,60}?\b(drikker|drinks)\b/i;
+              const nums: number[] = [];
+              for (const f of feats) {
+                const blob = [f?.name, f?.featureReferenceName, f?.featureShortDescription]
+                  .filter(Boolean).join(" | ");
+                const m = blob.match(drinkRegex);
+                if (m) nums.push(parseInt(m[1], 10));
+              }
+              if (nums.length) drinkCount = Math.max(...nums);
+            }
+
+            imageUrl = detail?.primaryImage?.url
+              ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY")?.url
+              ?? null;
+            productUrl = detail?.url
+              ? `https://www.home-appliances.philips${detail.url}`
+              : null;
+          }
+        } catch (e) {
+          console.warn("detail fetch failed for", code, e);
+        }
+
+        await supabaseAdmin.from("products").upsert({
+          code, name, price, rr_price: rr,
+          in_stock: isPurchasable, was_below_rrp: isBelow,
+          status: "active", last_checked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          category: cat.id,
+          is_refurbished: isRefurb,
+          ...(drinkCount != null ? { drink_count: drinkCount } : {}),
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+          ...(productUrl ? { product_url: productUrl } : {}),
+        });
+      }
+
+      currentPage += 1;
+    }
   }
 
   // Detect removed
@@ -167,7 +215,8 @@ async function runCheck() {
     if (!foundCodes.has(code) && prev.status !== "removed") {
       alerts.push({ type: "removed", product_code: code, product_name: prev.name,
         message: `🗑️ REMOVED — ${prev.name} has been delisted`,
-        price: prev.price, old_price: null, rr_price: prev.rr_price, discount_pct: null });
+        price: prev.price, old_price: null, rr_price: prev.rr_price, discount_pct: null,
+        category: (prev.category as Category) ?? "coffee" });
       await supabaseAdmin.from("products").update({ status: "removed", updated_at: new Date().toISOString() }).eq("code", code);
     }
   }
