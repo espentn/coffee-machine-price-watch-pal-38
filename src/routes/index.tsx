@@ -38,10 +38,10 @@ type Product = {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Espresso Watch — Philips Price Tracker" },
-      { name: "description", content: "Live price-drop and stock alerts for Philips helautomatisk espressomaskin." },
-      { property: "og:title", content: "Espresso Watch" },
-      { property: "og:description", content: "Live price-drop and stock alerts for Philips espresso machines." },
+      { title: "Home Watch — Philips Price Tracker" },
+      { name: "description", content: "Live price-drop and stock alerts for Philips espresso machines, air purifiers and vacuums." },
+      { property: "og:title", content: "Home Watch" },
+      { property: "og:description", content: "Live price-drop and stock alerts across Philips Norway." },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
