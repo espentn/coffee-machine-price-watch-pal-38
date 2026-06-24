@@ -16,7 +16,7 @@ type Alert = {
   created_at: string;
 };
 
-type Category = "coffee" | "air" | "vacuum";
+type Category = "coffee" | "air" | "vacuum" | "robot_vacuum";
 
 type Product = {
   code: string;
@@ -168,6 +168,7 @@ function Dashboard() {
   const coffeePick = useMemo(() => pickBest("coffee", { minDrinks: 7 }), [products]);
   const airPick = useMemo(() => pickBest("air"), [products]);
   const vacuumPick = useMemo(() => pickBest("vacuum"), [products]);
+  const robotVacuumPick = useMemo(() => pickBest("robot_vacuum"), [products]);
 
   // Top lists per category — scored same way, top 6
   function topList(cat: Category, limit = 6): { p: Product; discount: number }[] {
@@ -193,14 +194,17 @@ function Dashboard() {
   const coffeeTop = useMemo(() => topList("coffee"), [products]);
   const airTop = useMemo(() => topList("air"), [products]);
   const vacuumTop = useMemo(() => topList("vacuum"), [products]);
+  const robotVacuumTop = useMemo(() => topList("robot_vacuum"), [products]);
 
-  // Watchlist: Air Performer (any) + refurbished vacuums
+  // Watchlist: Air Performer (any) + refurbished vacuums + robot vacuums
   const watchlist = useMemo(() => {
     return products.filter((p) => {
       if (p.status !== "active") return false;
-      const isAirPerformer = p.name.toLowerCase().includes("air performer");
+      const name = p.name.toLowerCase();
+      const isAirPerformer = name.includes("air performer");
       const isRefurbVacuum = p.category === "vacuum" && p.is_refurbished;
-      return isAirPerformer || isRefurbVacuum;
+      const isRobotVacuum = p.category === "robot_vacuum";
+      return isAirPerformer || isRefurbVacuum || isRobotVacuum;
     });
   }, [products]);
 
@@ -237,20 +241,21 @@ function Dashboard() {
         </header>
 
         {/* Top picks: three columns */}
-        {(coffeePick || airPick || vacuumPick) && (
+        {(coffeePick || airPick || vacuumPick || robotVacuumPick) && (
           <section className="mb-10">
             <div className="mb-5">
               <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 <span style={{ color: "var(--gold)" }}>★</span> Top picks right now
               </div>
               <h2 className="text-2xl md:text-3xl font-semibold">
-                <span className="gold-text">Coffee</span>, <span className="gold-text">Air</span> &amp; <span className="gold-text">Vacuum</span>
+                <span className="gold-text">Coffee</span>, <span className="gold-text">Air</span>, <span className="gold-text">Vacuum</span> &amp; <span className="gold-text">Robot vacuum</span>
               </h2>
             </div>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
               <TopPickCard pick={coffeePick} category="coffee" />
               <TopPickCard pick={airPick} category="air" />
               <TopPickCard pick={vacuumPick} category="vacuum" />
+              <TopPickCard pick={robotVacuumPick} category="robot_vacuum" />
             </div>
           </section>
         )}
@@ -334,10 +339,11 @@ function Dashboard() {
 
 
         {/* Category top lists */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
           <CategoryTopList title="Coffee" emoji="☕" items={coffeeTop} />
           <CategoryTopList title="Air" emoji="🌬️" items={airTop} />
           <CategoryTopList title="Vacuum" emoji="🧹" items={vacuumTop} />
+          <CategoryTopList title="Robot vacuum" emoji="🤖" items={robotVacuumTop} />
         </div>
 
         <footer className="mt-12 text-center text-xs text-muted-foreground">
@@ -463,6 +469,7 @@ function TopPickCard({
     coffee: { label: "Coffee", emoji: "☕", tagline: "Best espresso value" },
     air: { label: "Air", emoji: "🌬️", tagline: "Best air purifier value" },
     vacuum: { label: "Vacuum", emoji: "🧹", tagline: "Best vacuum value" },
+    robot_vacuum: { label: "Robot vacuum", emoji: "🤖", tagline: "Best robot vacuum value" },
   }[category];
 
   if (!pick) {

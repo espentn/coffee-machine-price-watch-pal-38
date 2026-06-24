@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const BASE_URL = "https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/search";
 
-type Category = "coffee" | "air" | "vacuum";
+type Category = "coffee" | "air" | "vacuum" | "robot_vacuum";
 
 type CategoryConfig = {
   id: string;
@@ -34,7 +34,7 @@ const CATEGORIES: CategoryConfig[] = [
     id: "vacuum-robot",
     apiCategory: "ROBOT_VACUUMS_SU",
     keywords: ["robotstøvsuger", "robot vacuum", "robot vacuum cleaner", "robot støvsuger"],
-    category: "vacuum",
+    category: "robot_vacuum",
   },
 ];
 
