@@ -76,14 +76,19 @@ async function sendTelegram(text: string) {
 }
 
 async function runCheck() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const { data: existing } = await supabaseAdmin.from("products").select("*");
-  const db = new Map<string, any>();
-  (existing ?? []).forEach((p: any) => db.set(p.code, p));
-
-  const foundCodes = new Set<string>();
+  let supabaseAdmin: any = null;
+  let db = new Map<string, any>();
+  let foundCodes = new Set<string>();
   const alerts: AlertRow[] = [];
+
+  try {
+    const mod = await import("@/integrations/supabase/client.server");
+    supabaseAdmin = mod.supabaseAdmin;
+    const { data: existing } = await supabaseAdmin.from("products").select("*");
+    (existing ?? []).forEach((p: any) => db.set(p.code, p));
+  } catch (e: any) {
+    console.warn("Supabase unavailable during price check", e?.message ?? e);
+  }
 
   for (const cat of CATEGORIES) {
     let currentPage = 0;
@@ -203,17 +208,19 @@ async function runCheck() {
           console.warn("detail fetch failed for", code, e);
         }
 
-        await supabaseAdmin.from("products").upsert({
-          code, name, price, rr_price: rr,
-          in_stock: isPurchasable, was_below_rrp: isBelow,
-          status: "active", last_checked_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          category: cat.category,
-          is_refurbished: isRefurb,
-          ...(drinkCount != null ? { drink_count: drinkCount } : {}),
-          ...(imageUrl ? { image_url: imageUrl } : {}),
-          ...(productUrl ? { product_url: productUrl } : {}),
-        });
+        if (supabaseAdmin) {
+          await supabaseAdmin.from("products").upsert({
+            code, name, price, rr_price: rr,
+            in_stock: isPurchasable, was_below_rrp: isBelow,
+            status: "active", last_checked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            category: cat.category,
+            is_refurbished: isRefurb,
+            ...(drinkCount != null ? { drink_count: drinkCount } : {}),
+            ...(imageUrl ? { image_url: imageUrl } : {}),
+            ...(productUrl ? { product_url: productUrl } : {}),
+          });
+        }
       }
 
       currentPage += 1;
@@ -221,24 +228,27 @@ async function runCheck() {
   }
 
   // Detect removed
-  for (const [code, prev] of db) {
-    if (!foundCodes.has(code) && prev.status !== "removed") {
-      alerts.push({ type: "removed", product_code: code, product_name: prev.name,
-        message: `🗑️ REMOVED — ${prev.name} has been delisted`,
-        price: prev.price, old_price: null, rr_price: prev.rr_price, discount_pct: null,
-        category: (prev.category as Category) ?? "coffee" });
-      await supabaseAdmin.from("products").update({ status: "removed", updated_at: new Date().toISOString() }).eq("code", code);
+  if (supabaseAdmin) {
+    for (const [code, prev] of db) {
+      if (!foundCodes.has(code) && prev.status !== "removed") {
+        alerts.push({ type: "removed", product_code: code, product_name: prev.name,
+          message: `🗑️ REMOVED — ${prev.name} has been delisted`,
+          price: prev.price, old_price: null, rr_price: prev.rr_price, discount_pct: null,
+          category: (prev.category as Category) ?? "coffee" });
+        await supabaseAdmin.from("products").update({ status: "removed", updated_at: new Date().toISOString() }).eq("code", code);
+      }
+    }
+
+    if (alerts.length > 0) {
+      await supabaseAdmin.from("alerts").insert(alerts);
     }
   }
 
-  if (alerts.length > 0) {
-    await supabaseAdmin.from("alerts").insert(alerts);
-    for (const a of alerts) {
-      await sendTelegram(`<b>${a.product_name}</b>\n${a.message}`);
-    }
+  for (const a of alerts) {
+    await sendTelegram(`<b>${a.product_name}</b>\n${a.message}`);
   }
 
-  return { ok: true, alerts: alerts.length, products_checked: foundCodes.size };
+  return { ok: true, alerts: alerts.length, products_checked: foundCodes.size, note: supabaseAdmin ? null : "Supabase not configured; products were not persisted." };
 }
 
 export const Route = createFileRoute("/api/public/check-prices")({
