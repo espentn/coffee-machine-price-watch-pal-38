@@ -333,111 +333,11 @@ function Dashboard() {
         </div>
 
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr]">
-          {/* Alerts feed */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Alert feed</h2>
-            <div className="space-y-3">
-              {alerts.length === 0 && (
-                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                  No alerts yet. Hit <span className="text-primary">Check now</span> to seed the tracker — the first run
-                  records every product as a new arrival.
-                </div>
-              )}
-              {alerts.map((a) => {
-                const meta = TYPE_META[a.type] ?? { label: a.type, color: "var(--gold)", icon: "•" };
-                return (
-                  <article key={a.id} className="glass-card alert-enter rounded-2xl p-5">
-                    <div className="flex items-start gap-4">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-                        style={{ background: `${meta.color} / 0.15`, backgroundColor: `color-mix(in oklch, ${meta.color} 18%, transparent)`, color: meta.color }}
-                      >
-                        {meta.icon}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-[0.16em]" style={{ color: meta.color }}>
-                            {meta.label}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">• {timeAgo(a.created_at)}</span>
-                        </div>
-                        <h3 className="mt-1 truncate text-sm font-semibold text-foreground">{a.product_name}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{a.message}</p>
-                        {(a.price != null || a.discount_pct != null) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                            {a.price != null && (
-                              <span className="rounded-full bg-secondary/60 px-2.5 py-1 font-medium text-foreground">
-                                {fmtPrice(a.price)}
-                              </span>
-                            )}
-                            {a.old_price != null && (
-                              <span className="rounded-full bg-secondary/40 px-2.5 py-1 text-muted-foreground line-through">
-                                {fmtPrice(a.old_price)}
-                              </span>
-                            )}
-                            {a.discount_pct != null && (
-                              <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}>
-                                −{a.discount_pct}%
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Products */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Tracked products</h2>
-            <div className="space-y-3">
-              {products.length === 0 && (
-                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                  Nothing tracked yet.
-                </div>
-              )}
-              {products.map((p) => {
-                const discount = p.rr_price && p.price && p.price < p.rr_price
-                  ? Math.round(((p.rr_price - p.price) / p.rr_price) * 1000) / 10
-                  : 0;
-                const removed = p.status === "removed";
-                return (
-                  <div key={p.code} className="glass-card rounded-2xl p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h3 className={`truncate text-sm font-semibold ${removed ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                          {p.name}
-                        </h3>
-                        <div className="mt-1 text-[11px] text-muted-foreground">{p.code}</div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded-full bg-secondary/60 px-2.5 py-1 font-semibold text-foreground">
-                            {fmtPrice(p.price)}
-                          </span>
-                          {p.rr_price != null && p.price != null && p.price < p.rr_price && (
-                            <span className="rounded-full bg-secondary/40 px-2.5 py-1 text-muted-foreground line-through">
-                              {fmtPrice(p.rr_price)}
-                            </span>
-                          )}
-                          {discount > 0 && (
-                            <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}>
-                              −{discount}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <Pill ok={p.in_stock && !removed} okLabel="In stock" badLabel={removed ? "Removed" : "Sold out"} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+        {/* Category top lists */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <CategoryTopList title="Coffee" emoji="☕" items={coffeeTop} />
+          <CategoryTopList title="Air" emoji="🌬️" items={airTop} />
+          <CategoryTopList title="Vacuum" emoji="🧹" items={vacuumTop} />
         </div>
 
         <footer className="mt-12 text-center text-xs text-muted-foreground">
