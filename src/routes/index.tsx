@@ -167,6 +167,32 @@ function Dashboard() {
 
   const coffeePick = useMemo(() => pickBest("coffee", { minDrinks: 7 }), [products]);
   const airPick = useMemo(() => pickBest("air"), [products]);
+  const vacuumPick = useMemo(() => pickBest("vacuum"), [products]);
+
+  // Top lists per category — scored same way, top 6
+  function topList(cat: Category, limit = 6): { p: Product; discount: number }[] {
+    const eligible = products.filter((p) => p.category === cat && p.status === "active" && p.price != null);
+    if (eligible.length === 0) return [];
+    const prices = eligible.map((p) => p.price as number);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const scored = eligible.map((p) => {
+      const priceScore = maxP === minP ? 1 : 1 - ((p.price as number) - minP) / (maxP - minP);
+      const discount = p.rr_price && p.price && p.price < p.rr_price
+        ? (p.rr_price - p.price) / p.rr_price
+        : 0;
+      let extra = 0;
+      if (cat === "coffee" && p.drink_count) extra = Math.min(p.drink_count / 12, 1) * 0.3;
+      const stockPenalty = p.in_stock ? 0 : -0.5;
+      const score = priceScore * 0.45 + discount * 0.25 + extra + stockPenalty;
+      return { p, score, discount: Math.round(discount * 1000) / 10 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit);
+  }
+  const coffeeTop = useMemo(() => topList("coffee"), [products]);
+  const airTop = useMemo(() => topList("air"), [products]);
+  const vacuumTop = useMemo(() => topList("vacuum"), [products]);
 
   // Watchlist: Air Performer (any) + refurbished vacuums
   const watchlist = useMemo(() => {
@@ -210,20 +236,21 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Top picks: two columns */}
-        {(coffeePick || airPick) && (
+        {/* Top picks: three columns */}
+        {(coffeePick || airPick || vacuumPick) && (
           <section className="mb-10">
             <div className="mb-5">
               <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 <span style={{ color: "var(--gold)" }}>★</span> Top picks right now
               </div>
               <h2 className="text-2xl md:text-3xl font-semibold">
-                <span className="gold-text">Coffee</span> &amp; <span className="gold-text">Air</span> · side by side
+                <span className="gold-text">Coffee</span>, <span className="gold-text">Air</span> &amp; <span className="gold-text">Vacuum</span>
               </h2>
             </div>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
               <TopPickCard pick={coffeePick} category="coffee" />
               <TopPickCard pick={airPick} category="air" />
+              <TopPickCard pick={vacuumPick} category="vacuum" />
             </div>
           </section>
         )}
@@ -306,111 +333,11 @@ function Dashboard() {
         </div>
 
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr]">
-          {/* Alerts feed */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Alert feed</h2>
-            <div className="space-y-3">
-              {alerts.length === 0 && (
-                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                  No alerts yet. Hit <span className="text-primary">Check now</span> to seed the tracker — the first run
-                  records every product as a new arrival.
-                </div>
-              )}
-              {alerts.map((a) => {
-                const meta = TYPE_META[a.type] ?? { label: a.type, color: "var(--gold)", icon: "•" };
-                return (
-                  <article key={a.id} className="glass-card alert-enter rounded-2xl p-5">
-                    <div className="flex items-start gap-4">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-                        style={{ background: `${meta.color} / 0.15`, backgroundColor: `color-mix(in oklch, ${meta.color} 18%, transparent)`, color: meta.color }}
-                      >
-                        {meta.icon}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-[0.16em]" style={{ color: meta.color }}>
-                            {meta.label}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">• {timeAgo(a.created_at)}</span>
-                        </div>
-                        <h3 className="mt-1 truncate text-sm font-semibold text-foreground">{a.product_name}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{a.message}</p>
-                        {(a.price != null || a.discount_pct != null) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                            {a.price != null && (
-                              <span className="rounded-full bg-secondary/60 px-2.5 py-1 font-medium text-foreground">
-                                {fmtPrice(a.price)}
-                              </span>
-                            )}
-                            {a.old_price != null && (
-                              <span className="rounded-full bg-secondary/40 px-2.5 py-1 text-muted-foreground line-through">
-                                {fmtPrice(a.old_price)}
-                              </span>
-                            )}
-                            {a.discount_pct != null && (
-                              <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}>
-                                −{a.discount_pct}%
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Products */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Tracked products</h2>
-            <div className="space-y-3">
-              {products.length === 0 && (
-                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                  Nothing tracked yet.
-                </div>
-              )}
-              {products.map((p) => {
-                const discount = p.rr_price && p.price && p.price < p.rr_price
-                  ? Math.round(((p.rr_price - p.price) / p.rr_price) * 1000) / 10
-                  : 0;
-                const removed = p.status === "removed";
-                return (
-                  <div key={p.code} className="glass-card rounded-2xl p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h3 className={`truncate text-sm font-semibold ${removed ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                          {p.name}
-                        </h3>
-                        <div className="mt-1 text-[11px] text-muted-foreground">{p.code}</div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded-full bg-secondary/60 px-2.5 py-1 font-semibold text-foreground">
-                            {fmtPrice(p.price)}
-                          </span>
-                          {p.rr_price != null && p.price != null && p.price < p.rr_price && (
-                            <span className="rounded-full bg-secondary/40 px-2.5 py-1 text-muted-foreground line-through">
-                              {fmtPrice(p.rr_price)}
-                            </span>
-                          )}
-                          {discount > 0 && (
-                            <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--gold)", background: "color-mix(in oklch, var(--gold) 14%, transparent)" }}>
-                              −{discount}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <Pill ok={p.in_stock && !removed} okLabel="In stock" badLabel={removed ? "Removed" : "Sold out"} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+        {/* Category top lists */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <CategoryTopList title="Coffee" emoji="☕" items={coffeeTop} />
+          <CategoryTopList title="Air" emoji="🌬️" items={airTop} />
+          <CategoryTopList title="Vacuum" emoji="🧹" items={vacuumTop} />
         </div>
 
         <footer className="mt-12 text-center text-xs text-muted-foreground">
@@ -418,6 +345,85 @@ function Dashboard() {
         </footer>
       </div>
     </div>
+  );
+}
+
+
+function CategoryTopList({
+  title,
+  emoji,
+  items,
+}: {
+  title: string;
+  emoji: string;
+  items: { p: Product; discount: number }[];
+}) {
+  return (
+    <section className="glass-card rounded-3xl p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">
+          <span className="mr-2">{emoji}</span>
+          {title} <span className="text-muted-foreground">· top {items.length}</span>
+        </h2>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing tracked yet — run a check.</p>
+      ) : (
+        <ol className="space-y-2.5">
+          {items.map(({ p, discount }, i) => {
+            const removed = p.status === "removed";
+            return (
+              <li key={p.code}>
+                <a
+                  href={p.product_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="group flex items-center gap-3 rounded-xl bg-secondary/30 p-2.5 transition hover:bg-secondary/60"
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                    style={{
+                      background: i === 0 ? "var(--gold)" : "color-mix(in oklch, var(--gold) 14%, transparent)",
+                      color: i === 0 ? "#1a1108" : "var(--gold)",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-background/50">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-1" />
+                    ) : (
+                      <span className="text-lg">{emoji}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`truncate text-sm font-semibold group-hover:text-primary ${removed ? "text-muted-foreground line-through" : ""}`}>
+                      {p.name}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="font-semibold">{fmtPrice(p.price)}</span>
+                      {discount > 0 && (
+                        <span className="font-semibold" style={{ color: "var(--gold)" }}>
+                          −{discount}%
+                        </span>
+                      )}
+                      {p.is_refurbished && (
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                          style={{ color: "oklch(0.85 0.12 150)", background: "color-mix(in oklch, oklch(0.78 0.12 150) 16%, transparent)" }}>
+                          ♻
+                        </span>
+                      )}
+                      {!p.in_stock && <span className="text-muted-foreground">sold out</span>}
+                    </div>
+                  </div>
+                  <span className="text-muted-foreground group-hover:text-foreground">↗</span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 
