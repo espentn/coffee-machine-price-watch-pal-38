@@ -236,20 +236,21 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Top picks: two columns */}
-        {(coffeePick || airPick) && (
+        {/* Top picks: three columns */}
+        {(coffeePick || airPick || vacuumPick) && (
           <section className="mb-10">
             <div className="mb-5">
               <div className="mb-1 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 <span style={{ color: "var(--gold)" }}>★</span> Top picks right now
               </div>
               <h2 className="text-2xl md:text-3xl font-semibold">
-                <span className="gold-text">Coffee</span> &amp; <span className="gold-text">Air</span> · side by side
+                <span className="gold-text">Coffee</span>, <span className="gold-text">Air</span> &amp; <span className="gold-text">Vacuum</span>
               </h2>
             </div>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
               <TopPickCard pick={coffeePick} category="coffee" />
               <TopPickCard pick={airPick} category="air" />
+              <TopPickCard pick={vacuumPick} category="vacuum" />
             </div>
           </section>
         )}
