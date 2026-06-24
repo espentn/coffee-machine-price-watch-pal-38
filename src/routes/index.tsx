@@ -348,6 +348,85 @@ function Dashboard() {
   );
 }
 
+
+function CategoryTopList({
+  title,
+  emoji,
+  items,
+}: {
+  title: string;
+  emoji: string;
+  items: { p: Product; discount: number }[];
+}) {
+  return (
+    <section className="glass-card rounded-3xl p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">
+          <span className="mr-2">{emoji}</span>
+          {title} <span className="text-muted-foreground">· top {items.length}</span>
+        </h2>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing tracked yet — run a check.</p>
+      ) : (
+        <ol className="space-y-2.5">
+          {items.map(({ p, discount }, i) => {
+            const removed = p.status === "removed";
+            return (
+              <li key={p.code}>
+                <a
+                  href={p.product_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="group flex items-center gap-3 rounded-xl bg-secondary/30 p-2.5 transition hover:bg-secondary/60"
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                    style={{
+                      background: i === 0 ? "var(--gold)" : "color-mix(in oklch, var(--gold) 14%, transparent)",
+                      color: i === 0 ? "#1a1108" : "var(--gold)",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-background/50">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-auto object-contain p-1" />
+                    ) : (
+                      <span className="text-lg">{emoji}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`truncate text-sm font-semibold group-hover:text-primary ${removed ? "text-muted-foreground line-through" : ""}`}>
+                      {p.name}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="font-semibold">{fmtPrice(p.price)}</span>
+                      {discount > 0 && (
+                        <span className="font-semibold" style={{ color: "var(--gold)" }}>
+                          −{discount}%
+                        </span>
+                      )}
+                      {p.is_refurbished && (
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                          style={{ color: "oklch(0.85 0.12 150)", background: "color-mix(in oklch, oklch(0.78 0.12 150) 16%, transparent)" }}>
+                          ♻
+                        </span>
+                      )}
+                      {!p.in_stock && <span className="text-muted-foreground">sold out</span>}
+                    </div>
+                  </div>
+                  <span className="text-muted-foreground group-hover:text-foreground">↗</span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 function StatCard({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
   return (
     <div className="glass-card rounded-2xl p-5">
