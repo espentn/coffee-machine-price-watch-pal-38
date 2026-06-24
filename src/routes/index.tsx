@@ -295,8 +295,7 @@ function Dashboard() {
             </div>
           </section>
         )}
-          </section>
-        )}
+
 
         {/* Stats */}
         <div className="mb-10 grid grid-cols-2 gap-3 md:grid-cols-4">
