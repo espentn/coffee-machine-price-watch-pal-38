@@ -16,6 +16,8 @@ type Alert = {
   created_at: string;
 };
 
+type Category = "coffee" | "air" | "vacuum";
+
 type Product = {
   code: string;
   name: string;
@@ -28,6 +30,8 @@ type Product = {
   drink_count: number | null;
   image_url: string | null;
   product_url: string | null;
+  category: Category;
+  is_refurbished: boolean;
 };
 
 
