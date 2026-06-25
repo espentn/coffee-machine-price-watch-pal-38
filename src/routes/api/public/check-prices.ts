@@ -173,40 +173,48 @@ async function runCheck() {
           }
         }
 
-        // Enrich with drink count + image (drink count only meaningful for coffee)
-        let drinkCount: number | null = null;
-        let imageUrl: string | null = null;
-        let productUrl: string | null = null;
-        try {
-          const detailCode = code.replace(/\//g, "_");
-          const detailRes = await fetch(
-            `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${detailCode}?fields=FULL&lang=no_NO&curr=NOK`
-          );
-          if (detailRes.ok) {
-            const detail: any = await detailRes.json();
-            if (cat.id === "coffee") {
-              const feats: any[] = detail?.productFeatures?.features ?? [];
-              const drinkRegex = /(\d{1,2})[^\d]{0,60}?\b(drikker|drinks)\b/i;
-              const nums: number[] = [];
-              for (const f of feats) {
-                const blob = [f?.name, f?.featureReferenceName, f?.featureShortDescription]
-                  .filter(Boolean).join(" | ");
-                const m = blob.match(drinkRegex);
-                if (m) nums.push(parseInt(m[1], 10));
+        // Enrich with drink count + image — only if we haven't already, to stay
+        // under the Worker subrequest budget (each detail call = +1 fetch).
+        let drinkCount: number | null = prev?.drink_count ?? null;
+        let imageUrl: string | null = prev?.image_url ?? null;
+        let productUrl: string | null = prev?.product_url ?? null;
+        const needsEnrich =
+          !imageUrl ||
+          !productUrl ||
+          (cat.id === "coffee" && drinkCount == null);
+        if (needsEnrich) {
+          try {
+            const detailCode = code.replace(/\//g, "_");
+            const detailRes = await fetch(
+              `https://www.home-appliances.philips/occ/v2/versuni-b2c-no/products/${detailCode}?fields=FULL&lang=no_NO&curr=NOK`
+            );
+            if (detailRes.ok) {
+              const detail: any = await detailRes.json();
+              if (cat.id === "coffee" && drinkCount == null) {
+                const feats: any[] = detail?.productFeatures?.features ?? [];
+                const drinkRegex = /(\d{1,2})[^\d]{0,60}?\b(drikker|drinks)\b/i;
+                const nums: number[] = [];
+                for (const f of feats) {
+                  const blob = [f?.name, f?.featureReferenceName, f?.featureShortDescription]
+                    .filter(Boolean).join(" | ");
+                  const m = blob.match(drinkRegex);
+                  if (m) nums.push(parseInt(m[1], 10));
+                }
+                if (nums.length) drinkCount = Math.max(...nums);
               }
-              if (nums.length) drinkCount = Math.max(...nums);
-            }
 
-            imageUrl = detail?.primaryImage?.url
-              ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY")?.url
-              ?? null;
-            productUrl = detail?.url
-              ? `https://www.home-appliances.philips${detail.url}`
-              : null;
+              imageUrl = imageUrl
+                ?? detail?.primaryImage?.url
+                ?? (detail?.images ?? []).find((i: any) => i?.imageType === "PRIMARY")?.url
+                ?? null;
+              productUrl = productUrl
+                ?? (detail?.url ? `https://www.home-appliances.philips${detail.url}` : null);
+            }
+          } catch (e) {
+            console.warn("detail fetch failed for", code, e);
           }
-        } catch (e) {
-          console.warn("detail fetch failed for", code, e);
         }
+
 
         if (supabaseAdmin) {
           await supabaseAdmin.from("products").upsert({
