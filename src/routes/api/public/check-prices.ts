@@ -231,12 +231,18 @@ async function runCheck() {
             ...(imageUrl ? { image_url: imageUrl } : {}),
             ...(productUrl ? { product_url: productUrl } : {}),
           });
+          catCount += 1;
         }
       }
 
       currentPage += 1;
     }
+    } catch (e) {
+      console.warn(`[check-prices] category ${cat.id} failed:`, e);
+    }
+    console.log(`[check-prices] category ${cat.id}: upserted ${catCount}`);
   }
+
 
   // Detect removed
   if (supabaseAdmin) {
