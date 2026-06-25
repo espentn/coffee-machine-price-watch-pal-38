@@ -93,8 +93,11 @@ async function runCheck() {
   for (const cat of CATEGORIES) {
     let currentPage = 0;
     let totalPages = 1;
+    let catCount = 0;
 
+    try {
     while (currentPage < totalPages) {
+
       const params = new URLSearchParams({
         fields:
           "products(code,originalCode,name,purchasable,price(FULL),rrPrice(FULL),stock(FULL)),pagination(DEFAULT)",
